@@ -4,6 +4,7 @@
 import argparse
 import sys
 import codecs
+import locale
 from textwrap import dedent
 from importlib.metadata import entry_points
 from .__about__ import __version__
@@ -104,6 +105,12 @@ def main():
         help="List installed 3rd-party plugins. Plugins are loaded when using the -p or --use-plugin option.",
     )
 
+    parser.add_argument(
+        "--keep-data-uris",
+        action="store_true",
+        help="Keep data URIs (like base64-encoded images) in the output. By default, data URIs are truncated.",
+    )
+
     parser.add_argument("filename", nargs="?")
     args = parser.parse_args()
 
@@ -139,7 +146,7 @@ def main():
         else:
             charset_hint = None
 
-    stream_info: str | None = None
+    stream_info = None
     if (
         extension_hint is not None
         or mime_type_hint is not None
@@ -181,9 +188,15 @@ def main():
         markitdown = MarkItDown(enable_plugins=args.use_plugins)
 
     if args.filename is None:
-        result = markitdown.convert_stream(sys.stdin.buffer, stream_info=stream_info)
+        result = markitdown.convert_stream(
+            sys.stdin.buffer,
+            stream_info=stream_info,
+            keep_data_uris=args.keep_data_uris,
+        )
     else:
-        result = markitdown.convert(args.filename, stream_info=stream_info)
+        result = markitdown.convert(
+            args.filename, stream_info=stream_info, keep_data_uris=args.keep_data_uris
+        )
 
     _handle_output(args, result)
 
@@ -192,9 +205,14 @@ def _handle_output(args, result: DocumentConverterResult):
     """Handle output to stdout or file"""
     if args.output:
         with open(args.output, "w", encoding="utf-8") as f:
-            f.write(result.text_content)
+            f.write(result.markdown)
     else:
-        print(result.text_content)
+        # Handle stdout encoding errors more gracefully
+        print(
+            result.markdown.encode(sys.stdout.encoding, errors="replace").decode(
+                sys.stdout.encoding
+            )
+        )
 
 
 def _exit_with_error(message: str):

@@ -28,6 +28,10 @@ CANDIDATE_FILE_EXTENSIONS = [
 class RssConverter(DocumentConverter):
     """Convert RSS / Atom type to markdown"""
 
+    def __init__(self):
+        super().__init__()
+        self._kwargs = {}
+
     def accepts(
         self,
         file_stream: BinaryIO,
@@ -66,7 +70,7 @@ class RssConverter(DocumentConverter):
             file_stream.seek(cur_pos)
         return False
 
-    def _feed_type(self, doc: Any) -> str:
+    def _feed_type(self, doc: Any) -> str | None:
         if doc.getElementsByTagName("rss"):
             return "rss"
         elif doc.getElementsByTagName("feed"):
@@ -82,6 +86,7 @@ class RssConverter(DocumentConverter):
         stream_info: StreamInfo,
         **kwargs: Any,  # Options to pass to the converter
     ) -> DocumentConverterResult:
+        self._kwargs = kwargs
         doc = minidom.parse(file_stream)
         feed_type = self._feed_type(doc)
 
@@ -130,10 +135,10 @@ class RssConverter(DocumentConverter):
         Returns None if the feed type is not recognized or something goes wrong.
         """
         root = doc.getElementsByTagName("rss")[0]
-        channel = root.getElementsByTagName("channel")
-        if not channel:
-            return None
-        channel = channel[0]
+        channel_list = root.getElementsByTagName("channel")
+        if not channel_list:
+            raise ValueError("No channel found in RSS feed")
+        channel = channel_list[0]
         channel_title = self._get_data_by_tag_name(channel, "title")
         channel_description = self._get_data_by_tag_name(channel, "description")
         items = channel.getElementsByTagName("item")
@@ -141,8 +146,6 @@ class RssConverter(DocumentConverter):
             md_text = f"# {channel_title}\n"
         if channel_description:
             md_text += f"{channel_description}\n"
-        if not items:
-            items = []
         for item in items:
             title = self._get_data_by_tag_name(item, "title")
             description = self._get_data_by_tag_name(item, "description")
@@ -168,7 +171,7 @@ class RssConverter(DocumentConverter):
         try:
             # using bs4 because many RSS feeds have HTML-styled content
             soup = BeautifulSoup(content, "html.parser")
-            return _CustomMarkdownify().convert_soup(soup)
+            return _CustomMarkdownify(**self._kwargs).convert_soup(soup)
         except BaseException as _:
             return content
 
@@ -183,5 +186,6 @@ class RssConverter(DocumentConverter):
             return None
         fc = nodes[0].firstChild
         if fc:
-            return fc.data
+            if hasattr(fc, "data"):
+                return fc.data
         return None
