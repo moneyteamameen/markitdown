@@ -1,0 +1,10 @@
+fastapi>=0.68.0
+python-multipart>=0.0.5
+uvicorn>=0.15.0
+markitdown[all]==0.0.1a1
+pydantic>=1.8.2
+python-magic>=0.4.27
+charset-normalizer>=2.0.0
+beautifulsoup4>=4.9.0
+requests>=2.25.0
+markdownify>=0.6.0 
